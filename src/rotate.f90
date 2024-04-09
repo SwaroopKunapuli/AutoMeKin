@@ -84,7 +84,7 @@ END FUNCTION RAND1
 end module rancom
 
 program rotate
-use constants 
+use constants
 use atsymb
 use rancom
 implicit none
@@ -93,156 +93,149 @@ real(kind=8) :: rand
 integer(kind=8) :: iclock
 real, dimension(:), allocatable :: rr
 real :: twopi,rnd,phi,csthta,chi,thta,snthta,csphi,snchi,cschi,snphi
-real :: rxx, rxy,rxz,ryx,ryy,ryz,rzx,rzy,rzz,xcm1,ycm1,zcm1,xcm2,ycm2,zcm2,wt,x,y,z
+real :: rxx, rxy,rxz,ryx,ryy,ryz,rzx,rzy,rzz,wt,x,y,z ! xcm1,ycm1,zcm1,xcm2,ycm2,zcm2 removed for generalization
 real :: dist,distm,xdum,ydum,zdum,rmin
-integer :: i,n1,n,j,iii,nc,ijk,at1,at2
-
+integer :: i,numberoffragments,n,j,iii,nc,ijk,ii ! ii extra variable needed for generalization
+integer,allocatable :: numberofatomsineachfragment(:),com(:) ! n1 , at1, at2 removed for generalization
+real,allocatable :: xcm(:),ycm(:),zcm(:) ! Added for generalization
+integer :: atomindex
+integer, allocatable:: atomindexstart(:),atomindexend(:)
+integer :: interactions
 real,dimension(:),allocatable :: q,qq,w
 real, dimension(3) :: vcm,qcm
+
+
 character*2,dimension(:),allocatable :: fasymb
-read(*,*) n,n1,dist,distm
-read(*,*) at1,at2
-allocate(q(3*n),qq(3*n),fasymb(n),w(n),rr(n1*(n-n1)))
+
+
+! Added by Swaroop for generalization to more than two monomers
+read(*,*) numberoffragments,n,dist,distm
+
+allocate(atomindexstart(numberoffragments),atomindexend(numberoffragments))
+allocate(numberofatomsineachfragment(numberoffragments),com(numberoffragments))
+allocate(xcm(numberoffragments),ycm(numberoffragments),zcm(numberoffragments))
+
+atomindexstart(1)=1
+read(*,*) numberofatomsineachfragment(1),com(1)
+atomindexend(1)=numberofatomsineachfragment(1)
+atomindex=numberofatomsineachfragment(1)
+
+
+do i=2,numberoffragments
+   read(*,*) numberofatomsineachfragment(i), com(i)
+   atomindexstart(i)=atomindex+1
+   atomindex=atomindex+numberofatomsineachfragment(i)
+   atomindexend(i)=atomindex
+enddo
+
+
+allocate(q(3*n),qq(3*n),fasymb(n),w(n))
+
+
+interactions=0
+do i=1,numberoffragments-1
+   interactions=interactions+(numberofatomsineachfragment(i)*(n-atomindexend(i)))
+enddo
+
+
+allocate(rr(interactions))
+
 do i=1,n
    read(*,*) fasymb(i),q(3*i-2),q(3*i-1),q(3*i)
    do j = 1 , natom
       if(fasymb(i)==asymb(j)) w(i)=ams(j)
    enddo
 enddo
-! com of second monomer
-xcm2=0
-ycm2=0
-zcm2=0
-wt=0
-do i=n1+1,n
-   xcm2=xcm2+w(i)*q(3*i-2) 
-   ycm2=ycm2+w(i)*q(3*i-1) 
-   zcm2=zcm2+w(i)*q(3*i  ) 
-   wt=wt+w(i)
-enddo
-xcm2=xcm2/wt
-ycm2=ycm2/wt
-zcm2=zcm2/wt
-do i=n1+1,n
-   if(at2==-1) then
-      qq(3*i-2)=q(3*i-2)-xcm2
-      qq(3*i-1)=q(3*i-1)-ycm2
-      qq(3*i  )=q(3*i  )-zcm2
-   else
-      qq(3*i-2)=q(3*i-2)-q(3*at2-2)
-      qq(3*i-1)=q(3*i-1)-q(3*at2-1)
-      qq(3*i  )=q(3*i  )-q(3*at2  )
-   endif
-enddo
 
-! com of first monomer
-xcm1=0
-ycm1=0
-zcm1=0
-wt=0
-do i=1,n1
-   xcm1=xcm1+w(i)*q(3*i-2) 
-   ycm1=ycm1+w(i)*q(3*i-1) 
-   zcm1=zcm1+w(i)*q(3*i  ) 
-   wt=wt+w(i)
-enddo
-xcm1=xcm1/wt
-ycm1=ycm1/wt
-zcm1=zcm1/wt
-do i=1,n1
-   if(at1==-1) then
-      qq(3*i-2)=q(3*i-2)-xcm1
-      qq(3*i-1)=q(3*i-1)-ycm1
-      qq(3*i  )=q(3*i  )-zcm1 
-   else
-      qq(3*i-2)=q(3*i-2)-q(3*at1-2)
-      qq(3*i-1)=q(3*i-1)-q(3*at1-1)
-      qq(3*i  )=q(3*i  )-q(3*at1  )
-   endif
+
+! Generalized calculation of com of all molecules
+
+do ii=1,numberoffragments
+   xcm(ii)=0
+   ycm(ii)=0
+   zcm(ii)=0
+   do i=atomindexstart(ii),atomindexend(ii)
+      xcm(ii)=xcm(ii)+w(i)*q(3*i-2) 
+      ycm(ii)=ycm(ii)+w(i)*q(3*i-1) 
+      zcm(ii)=zcm(ii)+w(i)*q(3*i)
+      wt=wt+w(i)
+   enddo
+   xcm(ii)=xcm(ii)/wt
+   ycm(ii)=ycm(ii)/wt
+   zcm(ii)=zcm(ii)/wt
+   do i=atomindexstart(ii),atomindexend(ii)
+      if(com(ii)==-1) then
+         qq(3*i-2)=q(3*i-2)-xcm(ii)
+         qq(3*i-1)=q(3*i-1)-ycm(ii)
+         qq(3*i)=q(3*i)-zcm(ii)
+      else
+         qq(3*i-2)=q(3*i-2)-q(3*com(ii)-2)
+         qq(3*i-1)=q(3*i-1)-q(3*com(ii)-1)
+         qq(3*i)=q(3*i)-q(3*com(ii))
+      endif
+   enddo
 enddo
 
 twopi=2*pi
 
+! Generalized random rotation of all molecules
+
 CALL SYSTEM_CLOCK(COUNT=iclock)
 CALL RANDST(iclock)
 
-
-do iii=1,10000000
-!
-   rand=rand0(0)
-   PHI=TWOPI*RAND
-   rand=rand0(0)
-   CSTHTA=2.0D0*RAND-1.0D0
-   rand=rand0(0)
-   CHI=TWOPI*RAND
-   THTA=ACOS(CSTHTA)
-   SNTHTA=SIN(THTA)
-   SNPHI=SIN(PHI)
-   CSPHI=COS(PHI)
-   SNCHI=SIN(CHI)
-   CSCHI=COS(CHI)
-   RXX=CSTHTA*CSPHI*CSCHI-SNPHI*SNCHI
-   RXY=-CSTHTA*CSPHI*SNCHI-SNPHI*CSCHI
-   RXZ=SNTHTA*CSPHI
-   RYX=CSTHTA*SNPHI*CSCHI+CSPHI*SNCHI
-   RYY=-CSTHTA*SNPHI*SNCHI+CSPHI*CSCHI
-   RYZ=SNTHTA*SNPHI
-   RZX=-SNTHTA*CSCHI
-   RZY=SNTHTA*SNCHI
-   RZZ=CSTHTA
-!print*, n
-!print*,
-   DO I=N1+1,N
-      x=QQ(3*i-2)*RXX+QQ(3*i-1)*RXY+QQ(3*i)*RXZ
-      y=QQ(3*i-2)*RYX+QQ(3*i-1)*RYY+QQ(3*i)*RYZ
-      z=QQ(3*i-2)*RZX+QQ(3*i-1)*RZY+QQ(3*i)*RZZ
-      q(3*i-2)=x
-      q(3*i-1)=y
-      q(3*i  )=z
-   ENDDO
-
-   rand=rand0(0)
-   PHI=TWOPI*RAND
-   rand=rand0(0)
-   CSTHTA=2.0D0*RAND-1.0D0
-   rand=rand0(0)
-   CHI=TWOPI*RAND
-   THTA=ACOS(CSTHTA)
-   SNTHTA=SIN(THTA)
-   SNPHI=SIN(PHI)
-   CSPHI=COS(PHI)
-   SNCHI=SIN(CHI)
-   CSCHI=COS(CHI)
-   RXX=CSTHTA*CSPHI*CSCHI-SNPHI*SNCHI
-   RXY=-CSTHTA*CSPHI*SNCHI-SNPHI*CSCHI
-   RXZ=SNTHTA*CSPHI
-   RYX=CSTHTA*SNPHI*CSCHI+CSPHI*SNCHI
-   RYY=-CSTHTA*SNPHI*SNCHI+CSPHI*CSCHI
-   RYZ=SNTHTA*SNPHI
-   RZX=-SNTHTA*CSCHI
-   RZY=SNTHTA*SNCHI
-   RZZ=CSTHTA
+do iii=1,100000000
    nc=0
-   DO I=1,N1
-      x=QQ(3*i-2)*RXX+QQ(3*i-1)*RXY+QQ(3*i)*RXZ
-      y=QQ(3*i-2)*RYX+QQ(3*i-1)*RYY+QQ(3*i)*RYZ
-      z=QQ(3*i-2)*RZX+QQ(3*i-1)*RZY+QQ(3*i)*RZZ
-      q(3*i-2)=x+dist
-      q(3*i-1)=y
-      q(3*i  )=z
-      do ijk=n1+1,n
-         nc=nc+1
-         xdum= q(3*i-2) - q(3*ijk-2)
-         ydum= q(3*i-1) - q(3*ijk-1)
-         zdum= q(3*i  ) - q(3*ijk  )
-         rr(nc)=sqrt(xdum*xdum + ydum*ydum + zdum*zdum)
-!         print*, nc,rr(nc)
+   do ii=1,numberoffragments
+      rand=rand0(0)
+      PHI=TWOPI*RAND
+      rand=rand0(0)
+      CSTHTA=2.0D0*RAND-1.0D0
+      rand=rand0(0)
+      CHI=TWOPI*RAND
+      THTA=ACOS(CSTHTA)
+      SNTHTA=SIN(THTA)
+      SNPHI=SIN(PHI)
+      CSPHI=COS(PHI)
+      SNCHI=SIN(CHI)
+      CSCHI=COS(CHI)
+      RXX=CSTHTA*CSPHI*CSCHI-SNPHI*SNCHI
+      RXY=-CSTHTA*CSPHI*SNCHI-SNPHI*CSCHI
+      RXZ=SNTHTA*CSPHI
+      RYX=CSTHTA*SNPHI*CSCHI+CSPHI*SNCHI
+      RYY=-CSTHTA*SNPHI*SNCHI+CSPHI*CSCHI
+      RYZ=SNTHTA*SNPHI
+      RZX=-SNTHTA*CSCHI
+      RZY=SNTHTA*SNCHI
+      RZZ=CSTHTA
+      do i=atomindexstart(ii),atomindexend(ii)
+         x=QQ(3*i-2)*RXX+QQ(3*i-1)*RXY+QQ(3*i)*RXZ
+         y=QQ(3*i-2)*RYX+QQ(3*i-1)*RYY+QQ(3*i)*RYZ
+         z=QQ(3*i-2)*RZX+QQ(3*i-1)*RZY+QQ(3*i)*RZZ
+         if(ii==1)then
+            q(3*i-2)=x
+            q(3*i-1)=y
+            q(3*i)=z
+         endif
+         if(ii>1) then
+            q(3*i-2)=x+dist
+            q(3*i-1)=y
+            q(3*i)=z
+            do ijk=atomindexend(ii-1),1,-1
+               nc=nc+1
+               xdum=q(3*i-2)-q(3*ijk-2)
+               ydum=q(3*i-1)-q(3*ijk-1)
+               zdum=q(3*i)-q(3*ijk)
+               rr(nc)=sqrt(xdum*xdum + ydum*ydum + zdum*zdum)
+            enddo
+         endif
       enddo
-   ENDDO
+   enddo
+   
    rmin=minval(rr)
-!   print*, rmin
-   if(rmin>distm) exit 
+   if(rmin>distm) exit
 enddo
+
+
 do i=1,n
    print*, fasymb(i),q(3*i-2),q(3*i-1),q(3*i)
 enddo
