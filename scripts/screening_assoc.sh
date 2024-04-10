@@ -8,7 +8,8 @@ cwd=$PWD
 read_input
 ###
 
-assocdir=${cwd}/assoc_${frA}_${frB}
+assocdir=${cwd}/assoc_${molecule}
+
 assoclist=${assocdir}/assoclist
 screenlog=${assocdir}/screening.log
 
@@ -55,7 +56,8 @@ do
      echo $name" data">> $assocdir/assoclist_screened
    fi 
 
-   createMat.py tmp_geom 2 $nA
+   #createMat.py tmp_geom 2 $nA
+   createMat.py tmp_geom 2
 
    natom=$(awk 'NR==1{print $1}' tmp_geom )
    echo "1 $natom" | cat - ConnMat | sprint.exe >sprint.out
