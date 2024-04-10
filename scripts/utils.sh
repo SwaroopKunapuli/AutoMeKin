@@ -45,7 +45,6 @@ function print_ref {
    echo "==================================="
 }
 
-
 #Function to submit jobs using slurm
 function slurm {
 #lets the user specify memory
@@ -114,7 +113,11 @@ TASKS=$2
 #$parallel "runGP.sh {1} $molecule" ::: $(seq $noj1 $nojf)
 if [ -z "$SRUN" ]; then
    if [ -z $inter ]; then
-      $parallel $COMMAND ::: $TASKS 2> /dev/null
+      if [ -z $iter ]; then
+         $parallel $COMMAND ::: $TASKS 2> >(zenity --progress --auto-close --no-cancel --title="parallel progress bar $exe" --width=500 --height=100 2> /dev/null) &
+      else
+         $parallel $COMMAND ::: $TASKS 2> >(zenity --progress --auto-close --no-cancel --title="parallel progress bar $exe iter=$iter" --width=500 --height=100 2> /dev/null)  &
+      fi
    else
       nohup $parallel $COMMAND ::: $TASKS  >/dev/null 2>&1 & 
       echo $! > .parallel.pid
@@ -247,19 +250,31 @@ function read_input {
       echo invalid value for recalc keyword
       exit 
    fi
-   frA=$(awk '{if($1=="fragmentA") {print $2;exit}}' $inputfile)
-   frB=$(awk '{if($1=="fragmentB") {print $2;exit}}' $inputfile)
+   
+   number_of_fragments=$(awk '{if($1=="number_of_fragments"){print $2;exit}}' "$inputfile")
+   declare -a fr
+   declare -a natomfr
+   for i in $(seq 1 "$number_of_fragments"); do
+      fr=( "${fr[@]}"  "$(awk -v i="$i" '{if($1=="fragment_'$i'"){print $2;exit}}' "$inputfile")" )
+   done
+   echo "${fr[@]}"
+
    hessianmethod=$(awk 'BEGIN{m="analytic"};{if($1 == "hessianmethod") m=$2};END{print m}' $inputfile)
    if [ $sampling -ge 30 ];then
-      if [ -f ${frA}.xyz ]; then
-         nA=$(awk 'NR==1{print $1}' ${frA}.xyz)
-      fi
-      if [ -f ${frB}.xyz ]; then
-         nB=$(awk 'NR==1{print $1}' ${frB}.xyz)
-      fi
+      n=0
+      for i in $(seq 0 "$((number_of_fragments-1))"); do
+         if [ -f ${fr[i]}.xyz ]; then
+            natomfr=("${natomfr[@]}" "$(awk 'NR==1{print $1}' ${fr[i]}.xyz)")
+         fi
+      done
+      for i in $(seq 0 "$((number_of_fragments-1))"); do
+         n=$(echo "$n + ${natomfr[i]}" | bc)
+      done
+      echo "${natomfr[@]}"
    else
-      nA=$natom
+      nA=$natomfr[0]
       nB=0
+      nC=0
    fi
    nassoc=$(awk 'BEGIN{n=100};{if($1=="Nassoc") n=$2};END{print n}' $inputfile)
    ptgr=$(awk 'BEGIN{impa=0};{if($1=="ImpPaths") impa=$2};END{print impa}' $inputfile)
@@ -316,10 +331,15 @@ function read_input {
    prog=$(awk '{if("'$program_opt'"=="xtb") prog=-1;if("'$program_opt'"=="qcore") prog=0;if("'$program_opt'"=="mopac") prog=1; if("'$program_opt'"~/g[01][96]/) prog=2};END{print prog}' $inputfile)
    method_opt=$(awk 'BEGIN{llcalc="pm7"};{if($1=="LowLevel_TSopt") {llcalc=$3}};END{print tolower(llcalc)}' $inputfile)
    LLcalc=$(echo "$method_opt" | sed 's@/@ @g;s@u@@g' | awk 'BEGIN{IGNORECASE=1};{if($1=="hf") m="HF";else if($1=="mp2") m="MP2"; else if($1=="ccsd(t)") m="CCSDT";else m="DFT"};END{print m}' )
-   atom1rot=$(awk 'BEGIN{ff=-1};{if($1=="rotate") ff=$2;if(ff=="com") ff=-1};END{print ff}' $inputfile)
-   atom2rot=$(awk 'BEGIN{ff=-1};{if($1=="rotate") ff=$3;if(ff=="com") ff=-1};END{print ff}' $inputfile)
-   dist=$( awk 'BEGIN{d=4.0};{if($1=="rotate") d=$4};END{print d}' $inputfile)
-   distm=$(awk 'BEGIN{d=1.5};{if($1=="rotate") d=$5};END{print d}' $inputfile)
+   
+
+   for i in $(seq 1 "$number_of_fragments"); do
+      atomrot=( "${atomrot[@]}"  "$(awk -v i="$i" 'BEGIN{ff=-1};{if($1=="rotate") ff=$(('$i'+1));if(ff=="com") ff=-1};END{print ff}' "$inputfile")" )
+   done
+
+   dist=$(awk -v i="$number_of_fragments" 'BEGIN{d=4.0};{if($1=="rotate") d=$(('$i'+3))};END{print d}' $inputfile)
+   distm=$(awk -v i="$number_of_fragments" 'BEGIN{d=1.5};{if($1=="rotate") d=$(('$i'+4))};END{print d}' $inputfile)
+
    factorflipv=$( awk '{if($1=="factorflipv") factor=$2};END{print factor}'  $inputfile )
    nbondsfrozen=$( awk 'BEGIN{nbf=0};{if($1=="nbondsfrozen") nbf=$2};END{print nbf}'  $inputfile ) 
    if [ $nbondsfrozen -gt 0 ]; then
@@ -392,15 +412,20 @@ function read_input {
 ##Function to run the association complexes 
 function exec_assoc {
    if [ ${xyz_exists} -eq 0 ]; then
-      echo "Selecting a ${frA}-${frB} structure"
-      assocdir=${cwd}/assoc_${frA}_${frB}
+      
+      echo "Selecting a $molecule structure"
+      assocdir=${cwd}/assoc_$molecule
       if [ ! -d "$assocdir" ]; then mkdir $assocdir ; fi
-###
-      n="$(echo $nA $nB | awk '{print $1+$2}')"
-      echo $n $nA $dist $distm > rotate.dat
-      echo $atom1rot $atom2rot >> rotate.dat
-      awk '{if(NF==4) print $0}' ${frA}.xyz >>rotate.dat
-      awk '{if(NF==4) print $0}' ${frB}.xyz >>rotate.dat
+
+      echo $number_of_fragments","$n","$dist","$distm > rotate.dat  
+      
+      for i in $(seq 0 "$((number_of_fragments-1))"); do
+         echo ${natomfr[i]}","${atomrot[i]} >> rotate.dat
+      done
+      for i in $(seq 0 "$((number_of_fragments-1))"); do
+         awk '{if(NF==4) print $0}' ${fr[i]}.xyz >> rotate.dat
+      done
+
       rm -rf ${assocdir}/structures
       for i in $(seq 1 $nassoc)
       do
@@ -425,17 +450,17 @@ function exec_assoc {
       screening_assoc.sh $inputfile
       rm -rf black_list* rotate.* tmp_*
       if [ ! -f ${molecule}.xyz ]; then
-         echo "A structure for the ${frA}-${frB} complex could not be found"
+         echo "A structure for the ${molecule} complex could not be found"
          exit 1
       fi
    else
-      echo "${frA}-${frB} structure detected in the working directory"
+      echo "${molecule} structure detected in the working directory"
    fi
 ###for association stop here
    if [ $sampling -eq 30 ]; then
       echo ""
       echo "END OF THE CALCULATIONS"
-      echo "Check your ${frA}-${frB} structure in file ${molecule}.xyz"
+      echo "Check your ${molecule} structure in file ${molecule}.xyz"
       echo ""
       exit
    fi
@@ -551,13 +576,21 @@ else
       awk 'NR==1{natom=$1;print natom"\n";getline
            for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frB}.xyz > tmp && mv tmp ${frB}.xyz 
    fi
+   if [ ! -f ${frC}.xyz ]; then
+      echo $frC".xyz does not exist"
+      exit 1
+   else
+##remove second line if it exists
+      awk 'NR==1{natom=$1;print natom"\n";getline
+           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frC}.xyz > tmp && mv tmp ${frC}.xyz 
+   fi
    if [ -f ${molecule}.xyz ]; then
       xyz_exists=1
       xyzfile=${molecule}
       natom=$(awk 'NR==1{print $1}' ${molecule}.xyz)
    else
       xyz_exists=0
-      cat ${frA}.xyz ${frB}.xyz | awk '{if(NF==4) print $0}' > tmp_ABe 
+      cat ${frA}.xyz ${frB}.xyz ${frC}.xyz | awk '{if(NF==4) print $0}' > tmp_ABe 
       natom=$(wc -l tmp_ABe | awk '{print $1}' )
       echo $natom > tmp_AB.xyz
       echo "" >> tmp_AB.xyz
@@ -583,7 +616,7 @@ if [ $sampling -ne 30 ]; then
       echo "Low-level TS optim.   =" $program_opt "$method_opt"
    fi
 else
-   echo "Low-level A-B optim.  = $program_md" $met
+   echo "Low-level A-B-C optim.  = $program_md" $met
 fi
 }
 

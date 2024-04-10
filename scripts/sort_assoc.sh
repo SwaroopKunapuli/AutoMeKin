@@ -1,7 +1,6 @@
 inputfile=$1
-specA=$(awk '{if($1=="fragmentA") print $2}' $inputfile)
-specB=$(awk '{if($1=="fragmentB") print $2}' $inputfile)
-assocdir=${PWD}/assoc_${specA}_${specB}
+
+assocdir=${PWD}/assoc_${molecule}
 
 # We start with the TSs
 if [ -f tmp_oren ]; then rm tmp_oren ; fi
