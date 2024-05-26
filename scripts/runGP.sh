@@ -19,7 +19,8 @@ copyfrags=$(awk 'BEGIN{cf=0};{if($1=="sampling" && $2=="vdW") cf=1};END{print cf
 if [ $copyfrags -eq 1 ]; then
    frA=$(awk '{if($1=="fragmentA") print $2}' amk.dat)
    frB=$(awk '{if($1=="fragmentB") print $2}' amk.dat)
-   cp ${frA}.xyz ${frB}.xyz ${batch}
+   frC=$(awk '{if($1=="fragmentC") print $2}' amk.dat)
+   cp ${frA}.xyz ${frB}.xyz ${frC}.xyz ${batch}
 fi
 ##Launch the calcs
 if [ $1 -eq 1 ]; then

@@ -252,25 +252,29 @@ function read_input {
    fi
    
    number_of_fragments=$(awk '{if($1=="number_of_fragments"){print $2;exit}}' "$inputfile")
-   declare -a fr
+   declare -a frag
    declare -a natomfr
-   for i in $(seq 1 "$number_of_fragments"); do
-      fr=( "${fr[@]}"  "$(awk -v i="$i" '{if($1=="fragment_'$i'"){print $2;exit}}' "$inputfile")" )
+   frag="$(awk '{if($1=="fragment_1"){print $2;exit}}' "$inputfile")"
+   for i in $(seq 2 "$number_of_fragments"); do
+      frag=( "${frag[@]}"  "$(awk -v i="$i" '{if($1=="fragment_'$i'"){print $2;exit}}' "$inputfile")" )
    done
-   echo "${fr[@]}"
+   echo "${frag[@]}"
 
    hessianmethod=$(awk 'BEGIN{m="analytic"};{if($1 == "hessianmethod") m=$2};END{print m}' $inputfile)
    if [ $sampling -ge 30 ];then
       n=0
+      natomfr="$(awk 'NR==1{print $1}' "${frag[0]}".xyz)"
       for i in $(seq 0 "$((number_of_fragments-1))"); do
-         if [ -f ${fr[i]}.xyz ]; then
-            natomfr=("${natomfr[@]}" "$(awk 'NR==1{print $1}' ${fr[i]}.xyz)")
+         if [ -f "${frag[$i]}".xyz ]; then
+            echo "${frag[$i]}.xyz exists"
+            natomfr=("${natomfr[@]}" "$(awk 'NR==1{print $1}' "${frag[$i]}".xyz)")
          fi
       done
       for i in $(seq 0 "$((number_of_fragments-1))"); do
-         n=$(echo "$n + ${natomfr[i]}" | bc)
+         n=$(echo "$n + ${natomfr[$i]}" | bc)
       done
       echo "${natomfr[@]}"
+      echo "Total number of atoms: $n"
    else
       nA=$natomfr[0]
       nB=0
@@ -423,7 +427,7 @@ function exec_assoc {
          echo ${natomfr[i]}","${atomrot[i]} >> rotate.dat
       done
       for i in $(seq 0 "$((number_of_fragments-1))"); do
-         awk '{if(NF==4) print $0}' ${fr[i]}.xyz >> rotate.dat
+         awk '{if(NF==4) print $0}' ${frag[i]}.xyz >> rotate.dat
       done
 
       rm -rf ${assocdir}/structures
@@ -480,16 +484,29 @@ function keywords_check {
             exit 1
       fi
    fi
+#   if [ $sampling -ge 30 ]; then
+#      if [ -z $frA ]; then
+#         echo keyword fragmentA is mandatory with association sampling
+#         exit 1
+#      fi
+#      if [ -z $frB ]; then
+#         echo keyword fragmentB is mandatory with association sampling
+#         exit 1 
+#      fi
+#   fi
+
+
+#REPLACE ABOVE LINES WITH GENERALIZED IF LOOPS
    if [ $sampling -ge 30 ]; then
-      if [ -z $frA ]; then
-         echo keyword fragmentA is mandatory with association sampling
-         exit 1
-      fi
-      if [ -z $frB ]; then
-         echo keyword fragmentB is mandatory with association sampling
-         exit 1 
-      fi
+      for i in $(seq 0 "$((number_of_fragments-1))"); do
+         if [ -z "${frag[$i]}" ]; then
+            j=$((i+1))
+            echo keyword fragment_$j is mandatory with association sampling
+            exit 1
+         fi
+      done
    fi
+
 ###warning
 ###Incompatibilities of Entos Qcore
    if [ "$program_opt" = "qcore" ] && [ $sampling -eq 1 ]; then
@@ -560,37 +577,49 @@ if [ $sampling -lt 30 ]; then
 ##create reference distances : cov
    fi
 else
-   if [ ! -f ${frA}.xyz ]; then
-      echo $frA".xyz does not exist"
-      exit 1
-   else
+   for i in $(seq 0 "$((number_of_fragments-1))"); do
+      if [ ! -f ${frag[i]}.xyz ]; then
+         echo ${frag[i]}.xyz does not exist
+         exit 1
+      else
+         awk 'NR==1{natom=$1;print natom"\n";getline
+              for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frag[i]}.xyz > tmp && mv tmp ${frag[i]}.xyz 
+      fi
+   done
+#   if [ ! -f ${frA}.xyz ]; then
+#      echo $frA".xyz does not exist"
+#      exit 1
+#   else
 ##remove second line if it exists
-      awk 'NR==1{natom=$1;print natom"\n";getline
-           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frA}.xyz > tmp && mv tmp ${frA}.xyz 
-  fi
-   if [ ! -f ${frB}.xyz ]; then
-      echo $frB".xyz does not exist"
-      exit 1
-   else
+#      awk 'NR==1{natom=$1;print natom"\n";getline
+#           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frA}.xyz > tmp && mv tmp ${frA}.xyz 
+#  fi
+#   if [ ! -f ${frB}.xyz ]; then
+#      echo $frB".xyz does not exist"
+#      exit 1
+#   else
 ##remove second line if it exists
-      awk 'NR==1{natom=$1;print natom"\n";getline
-           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frB}.xyz > tmp && mv tmp ${frB}.xyz 
-   fi
-   if [ ! -f ${frC}.xyz ]; then
-      echo $frC".xyz does not exist"
-      exit 1
-   else
+#      awk 'NR==1{natom=$1;print natom"\n";getline
+#           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frB}.xyz > tmp && mv tmp ${frB}.xyz 
+#   fi
+#   if [ ! -f ${frC}.xyz ]; then
+#      echo $frC".xyz does not exist"
+#      exit 1
+#   else
 ##remove second line if it exists
-      awk 'NR==1{natom=$1;print natom"\n";getline
-           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frC}.xyz > tmp && mv tmp ${frC}.xyz 
-   fi
+#      awk 'NR==1{natom=$1;print natom"\n";getline
+#           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frC}.xyz > tmp && mv tmp ${frC}.xyz 
+#   fi
    if [ -f ${molecule}.xyz ]; then
       xyz_exists=1
       xyzfile=${molecule}
       natom=$(awk 'NR==1{print $1}' ${molecule}.xyz)
    else
       xyz_exists=0
-      cat ${frA}.xyz ${frB}.xyz ${frC}.xyz | awk '{if(NF==4) print $0}' > tmp_ABe 
+      for i in $(seq 0 "$((number_of_fragments-1))"); do
+         cat ${frag[i]}.xyz >> tmp_AB
+      done
+#      cat ${frA}.xyz ${frB}.xyz ${frC}.xyz | awk '{if(NF==4) print $0}' > tmp_ABe 
       natom=$(wc -l tmp_ABe | awk '{print $1}' )
       echo $natom > tmp_AB.xyz
       echo "" >> tmp_AB.xyz
