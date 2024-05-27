@@ -477,7 +477,7 @@ function keywords_check {
       echo " Your molecule keyword is missing in the input file"
       exit 1
    fi
-##Kinetics section (except for association) and frA frB checks (association and vdw)
+##Kinetics section (except for association) and fragments checks (association and vdw)
    if [ $sampling -ne 30 ]; then
       if [ $rate -eq -1 ]; then echo "Please provide a value for keywords Energy or Temperature in the Kinetics section"; exit; fi
       if [ $rate -eq 1 ] && [ $energy -eq 0  ] ; then
@@ -485,16 +485,6 @@ function keywords_check {
             exit 1
       fi
    fi
-#   if [ $sampling -ge 30 ]; then
-#      if [ -z $frA ]; then
-#         echo keyword fragmentA is mandatory with association sampling
-#         exit 1
-#      fi
-#      if [ -z $frB ]; then
-#         echo keyword fragmentB is mandatory with association sampling
-#         exit 1 
-#      fi
-#   fi
 
    echo "Reached the keywords check"
 #REPLACE ABOVE LINES WITH GENERALIZED IF LOOPS

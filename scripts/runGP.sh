@@ -17,10 +17,12 @@ echo "tsdirll $3/tsdirLL_$2"  >> ${batch}/amk.dat
 ##copy frags only if sampling is vdw
 copyfrags=$(awk 'BEGIN{cf=0};{if($1=="sampling" && $2=="vdW") cf=1};END{print cf}'  amk.dat)
 if [ $copyfrags -eq 1 ]; then
-   frA=$(awk '{if($1=="fragmentA") print $2}' amk.dat)
-   frB=$(awk '{if($1=="fragmentB") print $2}' amk.dat)
-   frC=$(awk '{if($1=="fragmentC") print $2}' amk.dat)
-   cp ${frA}.xyz ${frB}.xyz ${frC}.xyz ${batch}
+   for i in $(seq 1 "$number_of_fragments"); do
+      frag=( "${frag[@]}"  "$(awk -v i="$i" '{if($1=="fragment_'$i'"){print $2;exit}}' "$inputfile")" )
+   done
+   for i in $(seq 0 $((number_of_fragments-1))); do
+      cp "${frag[$i]}".xyz ${batch}
+   done
 fi
 ##Launch the calcs
 if [ $1 -eq 1 ]; then
