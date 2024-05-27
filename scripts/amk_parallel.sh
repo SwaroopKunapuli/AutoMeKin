@@ -39,7 +39,7 @@ read_input
 amk_parallel_check
 ###keywords check: molecule and rate
 keywords_check
-### ${molecule}.xyz and/or ${frA}.xyz ${frB}.xyz file check
+### ${molecule}.xyz and/or fragment .xyz files check
 xyzfiles_check
 ##
 sampling_calcs

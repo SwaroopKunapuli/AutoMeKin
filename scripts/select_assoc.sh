@@ -10,8 +10,6 @@ inputfile=$1
 read_input
 ##
 
-##assocdir=${cwd}/assoc_${frA}_${frB}_${frC}
-
 concat_fr=${frag[0]}
 for i in $(seq 1 "$((number_of_fragments-1))"); do
    concat_fr=${concat_fr}_${frag[i]}
