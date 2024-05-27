@@ -1,5 +1,5 @@
 #!/bin/bash
-source utils_modified.sh
+source utils.sh
 
 inputfile=$1
 exe=$(basename $0)

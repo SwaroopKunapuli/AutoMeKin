@@ -252,10 +252,9 @@ function read_input {
    fi
    
    number_of_fragments=$(awk '{if($1=="number_of_fragments"){print $2;exit}}' "$inputfile")
-   declare -a frag
-   declare -a natomfr
-   frag="$(awk '{if($1=="fragment_1"){print $2;exit}}' "$inputfile")"
-   for i in $(seq 2 "$number_of_fragments"); do
+   declare -ag frag
+   declare -ag natomfr
+   for i in $(seq 1 "$number_of_fragments"); do
       frag=( "${frag[@]}"  "$(awk -v i="$i" '{if($1=="fragment_'$i'"){print $2;exit}}' "$inputfile")" )
    done
    echo "${frag[@]}"
@@ -263,18 +262,14 @@ function read_input {
    hessianmethod=$(awk 'BEGIN{m="analytic"};{if($1 == "hessianmethod") m=$2};END{print m}' $inputfile)
    if [ $sampling -ge 30 ];then
       n=0
-      natomfr="$(awk 'NR==1{print $1}' "${frag[0]}".xyz)"
       for i in $(seq 0 "$((number_of_fragments-1))"); do
          if [ -f "${frag[$i]}".xyz ]; then
-            echo "${frag[$i]}.xyz exists"
             natomfr=("${natomfr[@]}" "$(awk 'NR==1{print $1}' "${frag[$i]}".xyz)")
          fi
       done
       for i in $(seq 0 "$((number_of_fragments-1))"); do
          n=$(echo "$n + ${natomfr[$i]}" | bc)
       done
-      echo "${natomfr[@]}"
-      echo "Total number of atoms: $n"
    else
       nA=$natomfr[0]
       nB=0
@@ -336,13 +331,17 @@ function read_input {
    method_opt=$(awk 'BEGIN{llcalc="pm7"};{if($1=="LowLevel_TSopt") {llcalc=$3}};END{print tolower(llcalc)}' $inputfile)
    LLcalc=$(echo "$method_opt" | sed 's@/@ @g;s@u@@g' | awk 'BEGIN{IGNORECASE=1};{if($1=="hf") m="HF";else if($1=="mp2") m="MP2"; else if($1=="ccsd(t)") m="CCSDT";else m="DFT"};END{print m}' )
    
-
+   declare -ag atomrot
    for i in $(seq 1 "$number_of_fragments"); do
       atomrot=( "${atomrot[@]}"  "$(awk -v i="$i" 'BEGIN{ff=-1};{if($1=="rotate") ff=$(('$i'+1));if(ff=="com") ff=-1};END{print ff}' "$inputfile")" )
    done
+   echo "Pivot points for internal reading are ${atomrot[@]}"
+#   dist=$(awk -v i="$number_of_fragments" 'BEGIN{d=4.0};{if($1=="rotate") d=$(('$i'+3))};END{print d}' $inputfile)
+#   distm=$(awk -v i="$number_of_fragments" 'BEGIN{d=1.5};{if($1=="rotate") d=$(('$i'+4))};END{print d}' $inputfile)
 
-   dist=$(awk -v i="$number_of_fragments" 'BEGIN{d=4.0};{if($1=="rotate") d=$(('$i'+3))};END{print d}' $inputfile)
-   distm=$(awk -v i="$number_of_fragments" 'BEGIN{d=1.5};{if($1=="rotate") d=$(('$i'+4))};END{print d}' $inputfile)
+   dist=$(awk 'BEGIN{d=4.0};{if($1=="dist") d=$2};END{print d}' $inputfile)
+   distm=$(awk 'BEGIN{d=1.5};{if($1=="distm") d=$2};END{print d}' $inputfile)
+
 
    factorflipv=$( awk '{if($1=="factorflipv") factor=$2};END{print factor}'  $inputfile )
    nbondsfrozen=$( awk 'BEGIN{nbf=0};{if($1=="nbondsfrozen") nbf=$2};END{print nbf}'  $inputfile ) 
@@ -411,6 +410,7 @@ function read_input {
    fi
 ###some few constants
    nfrag_th=0.005
+   echo "Input read correctly"
 }
 
 ##Function to run the association complexes 
@@ -495,7 +495,7 @@ function keywords_check {
 #      fi
 #   fi
 
-
+   echo "Reached the keywords check"
 #REPLACE ABOVE LINES WITH GENERALIZED IF LOOPS
    if [ $sampling -ge 30 ]; then
       for i in $(seq 0 "$((number_of_fragments-1))"); do
@@ -586,40 +586,17 @@ else
               for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frag[i]}.xyz > tmp && mv tmp ${frag[i]}.xyz 
       fi
    done
-#   if [ ! -f ${frA}.xyz ]; then
-#      echo $frA".xyz does not exist"
-#      exit 1
-#   else
-##remove second line if it exists
-#      awk 'NR==1{natom=$1;print natom"\n";getline
-#           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frA}.xyz > tmp && mv tmp ${frA}.xyz 
-#  fi
-#   if [ ! -f ${frB}.xyz ]; then
-#      echo $frB".xyz does not exist"
-#      exit 1
-#   else
-##remove second line if it exists
-#      awk 'NR==1{natom=$1;print natom"\n";getline
-#           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frB}.xyz > tmp && mv tmp ${frB}.xyz 
-#   fi
-#   if [ ! -f ${frC}.xyz ]; then
-#      echo $frC".xyz does not exist"
-#      exit 1
-#   else
-##remove second line if it exists
-#      awk 'NR==1{natom=$1;print natom"\n";getline
-#           for(i=1;i<=natom;i++) {getline; print $1,$2,$3,$4} }' ${frC}.xyz > tmp && mv tmp ${frC}.xyz 
-#   fi
+   echo "The molecule is "${molecule}" "
    if [ -f ${molecule}.xyz ]; then
+      echo "The xyz file for the molecule exists"
       xyz_exists=1
       xyzfile=${molecule}
       natom=$(awk 'NR==1{print $1}' ${molecule}.xyz)
    else
       xyz_exists=0
       for i in $(seq 0 "$((number_of_fragments-1))"); do
-         cat ${frag[i]}.xyz >> tmp_AB
+         cat ${frag[i]}.xyz | awk '{if(NF==4) print $0}' >> tmp_ABe
       done
-#      cat ${frA}.xyz ${frB}.xyz ${frC}.xyz | awk '{if(NF==4) print $0}' > tmp_ABe 
       natom=$(wc -l tmp_ABe | awk '{print $1}' )
       echo $natom > tmp_AB.xyz
       echo "" >> tmp_AB.xyz
@@ -631,6 +608,8 @@ else
    if [ $ok -eq 0 ];then
       echo Some of the atoms in your structure cannot be treated with this sampling
       exit
+   else
+      echo "Check vdw atoms passed"ks
    fi
 fi
 echo "Number of atoms       =" $natom
