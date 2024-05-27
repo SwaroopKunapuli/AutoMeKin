@@ -8,7 +8,14 @@ cwd=$PWD
 read_input
 ###
 
-assocdir=${cwd}/assoc_${molecule}
+##assocdir=${cwd}/assoc_${frA}_${frB}_${frC}
+
+concat_fr=${frag[0]}
+for i in $(seq 1 "$((number_of_fragments-1))"); do
+   concat_fr=${concat_fr}_${frag[i]}
+done
+echo "${concat_fr}"
+assocdir=${cwd}/assoc_${concat_fr}
 
 assoclist=${assocdir}/assoclist
 screenlog=${assocdir}/screening.log
@@ -56,8 +63,7 @@ do
      echo $name" data">> $assocdir/assoclist_screened
    fi 
 
-   #createMat.py tmp_geom 2 $nA
-   createMat.py tmp_geom 2
+   createMat.py tmp_geom 2 $nA
 
    natom=$(awk 'NR==1{print $1}' tmp_geom )
    echo "1 $natom" | cat - ConnMat | sprint.exe >sprint.out
