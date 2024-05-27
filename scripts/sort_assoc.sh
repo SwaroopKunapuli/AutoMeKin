@@ -7,7 +7,7 @@ inputfile=$1
 
 concat_fr=${frag[0]}
 for i in $(seq 1 "$((number_of_fragments-1))"); do
-   concat_fr=${concat_fr}_${frag[i]}
+   concat_fr=${concat_fr}-${frag[i]}
 done
 echo "${concat_fr}"
 assocdir=${cwd}/assoc_${concat_fr}

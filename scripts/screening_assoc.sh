@@ -10,7 +10,7 @@ read_input
 
 concat_fr=${frag[0]}
 for i in $(seq 1 "$((number_of_fragments-1))"); do
-   concat_fr=${concat_fr}_${frag[i]}
+   concat_fr=${concat_fr}-${frag[i]}
 done
 echo "${concat_fr}"
 assocdir=${cwd}/assoc_${concat_fr}
@@ -27,6 +27,10 @@ trap cleanup EXIT INT
 nrep=0
 nerr=0
 nfra=0
+if [ ! -f ${screenlog} ]; then 
+   touch ${screenlog} 
+   echo "${screenlog} has been created"
+fi
 echo "Summary of screening calculations." > ${screenlog}
 ##
 ls $assocdir/assoc*.out > $assoclist
@@ -61,7 +65,7 @@ do
      echo $name" data">> $assocdir/assoclist_screened
    fi 
 
-   createMat.py tmp_geom 2 $nA
+   createMat.py tmp_geom 2 $natom
 
    natom=$(awk 'NR==1{print $1}' tmp_geom )
    echo "1 $natom" | cat - ConnMat | sprint.exe >sprint.out
