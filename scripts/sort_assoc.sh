@@ -1,9 +1,10 @@
 inputfile=$1
-#specA=$(awk '{if($1=="fragmentA") print $2}' $inputfile)
-#specB=$(awk '{if($1=="fragmentB") print $2}' $inputfile)
-#specC=$(awk '{if($1=="fragmentC") print $2}' $inputfile)
-#assocdir=${PWD}/assoc_${specA}_${specB}_${specC}
-
+number_of_fragments=$(awk 'BEGIN{nf=0};{if($1=="number_of_fragments") nf=$2};END{print nf}' $inputfile)
+cwd=$PWD
+declare -ag frag
+for i in $(seq 1 "${number_of_fragments}"); do
+   frag=( "${frag[@]}"  "$(awk -v i="$i" '{if($1=="fragment_'$i'"){print $2;exit}}' "$inputfile")" )
+done
 
 concat_fr=${frag[0]}
 for i in $(seq 1 "$((number_of_fragments-1))"); do
