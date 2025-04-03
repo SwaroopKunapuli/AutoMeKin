@@ -8,7 +8,7 @@ from mopacamk import MOPACamk
 from ase.optimize import BFGS
 from ase.io import read
 from ase.units import kcal, mol, Bohr
-from AMK_parameters import nbonds,prog,method,task,relscf,active,max_val,min_val,startd,label,comb22,cov_rad,Crossb,MaxBoB,MaxBoF
+from AMK_parameters import nbonds,prog,method,task,relscf,active,max_val,min_val,startd,label,comb22,cov_rad,Crossb,MaxBoB,MaxBoF,MaxBO
 from createMat import get_G_index
 #from xtb.ase.calculator import XTB
 #from xtb.interface import Calculator,Param,Environment
@@ -116,7 +116,7 @@ def comb_process(comb):
     for ele in comb[1]: G.remove_edge(ind[ele],jnd[ele])
     ##Check valencies and stuff
     if CheckMove(G):
-        A   = nx.adjacency_matrix(G) ; Ap  = A.toarray()
+        Ap  = nx.to_numpy_array(G) 
         for z in range(natom): Ap[z][z] = aton[z]
         Ats = 0.5 * (Ar + Ap)
         tag = sorted( [np.round(elem,3) for elem in np.linalg.eigvals(Ats) ] )
@@ -155,6 +155,7 @@ with open('amk.dat') as inp:
             else: Crossb = False
         if line.find('MaxBoF')    !=-1: MaxBoF = int(line.split()[1]) 
         if line.find('MaxBoB')    !=-1: MaxBoB = int(line.split()[1]) 
+        if line.find('MaxBO')     !=-1: MaxBO  = float(line.split()[1]) 
         if line.find('neighbors') !=-1: 
             atom = str(line.split()[1]) 
             vale = [int(x) for x in re.sub('[^0-9]',' ', line).split(' ') if x != '' ]
@@ -215,7 +216,7 @@ if prog == 'mopac': bo = [float(item) for item in rmol.calc.get_bond_order()]
 act_break = []; act_form = [] 
 for i in act_dist:
     if G.has_edge(ind[i],jnd[i]): 
-        if bo[i] < 1.5: act_break.append(i)
+        if bo[i] < MaxBO: act_break.append(i)
     else: 
 #check bond formation is possible--> d_ij < startd and path does not cross an existing bond
         dij = d[ind[i]][jnd[i]] 
@@ -234,7 +235,7 @@ for i in act_dist:
         if add_bond and dij < startd: act_form.append(i)
 
 G_orig = G.copy() 
-A  = nx.adjacency_matrix(G) ; Ar = A.toarray()
+Ar  = nx.to_numpy_array(G) 
 for z in range(natom): Ar[z][z] = aton[z]
 nts = 0 ; dict_ts = {} 
 
